@@ -15,7 +15,7 @@ function Body(x,y, radii)
     this.vx = 0//Math.pow(-1,Math.round(2*Math.random()))*100*Math.random()+0.1;
     this.vy = 0//Math.pow(-1,Math.round(2*Math.random()))*100*Math.random()+0.1;
     this.fx = 0;
-    this.fy = 1000;
+    this.fy = 0;
     this.moveForce = function()
       {
         this.ax = this.fx/this.mass;
@@ -426,6 +426,7 @@ function Controller(reactor, renderer)
     this.simState = 1;
     this.simTime = 0;
     this.drawTime = 0;
+
     this.reactor = reactor;
     this.renderer = renderer;
 
@@ -505,10 +506,10 @@ window.onload = function()
     //Filling system
     for (var i = 0; i<100; i++) 
       { system.push( new Body(Math.random()*700, Math.random()*400, 10) ); }
-    react = new Reactor(system);
+    reactor = new Reactor(system);
     viewport = new Renderer("canva", 1000,600, system);
-    controller = new Controller( react, viewport );
-    controller.run(0,10);    
+    controller = new Controller( reactor, viewport );
+    controller.run(0,0);    
   };
 
 
