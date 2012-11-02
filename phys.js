@@ -15,7 +15,7 @@ function Body(x,y, radii)
     this.vx = 0//Math.pow(-1,Math.round(2*Math.random()))*100*Math.random()+0.1;
     this.vy = 0//Math.pow(-1,Math.round(2*Math.random()))*100*Math.random()+0.1;
     this.fx = 0;
-    this.fy = 0;
+    this.fy = 1000;
     this.moveForce = function()
       {
         this.ax = this.fx/this.mass;
@@ -76,37 +76,40 @@ function dropForces()
     arguments[0].fx = 0;
     arguments[0].fy = 0;
   }
+
 function resFriction() //first argument is always current body, second = system
   {
     //console.log("call res function;")
     arguments[0].fy += -5*arguments[0].vy;
     arguments[0].fx += -5*arguments[0].vx;
   };
+
 function gravi()
   {
+
     var body = arguments[0];
     var system = arguments[1];
     
-    //console.log("call for 'gravi'");
-    for (var i=0; i<system.length; i++)
+    system.map(
+    function(current_body)
       {
-        if (!body.charged) break;
-        if (!system[i].charged) continue;
-        //console.log("call for 'gravi'");
         var qdist = 
-        (body.x - system[i].x)*(body.x - system[i].x) + 
-        (body.y - system[i].y)*(body.y - system[i].y);
+        (body.x - current_body.x)*(body.x - current_body.x) + 
+        (body.y - current_body.y)*(body.y - current_body.y);
 
         if (qdist > 0)
           {
-            var force = -10 * body.mass * system[i].mass / qdist;
-            //console.log(force);
-            body.fx += force*(body.x - system[i].x)/Math.sqrt(qdist);
-            body.fy += force*(body.y - system[i].y)/Math.sqrt(qdist);
+            var force = -2 * body.mass * current_body.mass / qdist;
+
+            body.fx += force*(body.x - current_body.x)/Math.sqrt(qdist);
+            body.fy += force*(body.y - current_body.y)/Math.sqrt(qdist);
           }
       }
-    
+    )
+    //end of map
   }
+
+
 function collisions(system_object)
 {
   var bounce = 0.95;
@@ -251,10 +254,12 @@ function Grid(box, hres, vres)
 
     this.clearCells = function()
       {
-        for (var l=0; l<this.cells.length; l++)
-          {
-            this.cells[l].clear();
+        this.cells.map(
+        function(cell)
+          { 
+            cell.clear()
           }
+        )
       }
     
   }
@@ -263,34 +268,42 @@ function Grid(box, hres, vres)
 function Reactor(system_object)
   {
     this.system = system_object;
-    this.grid = new Grid(system_object.box, 40, 20);
-    this.forces = [dropForces, gravi ];
+    this.grid = new Grid(system_object.box, 5, 2);
+    this.forces = [dropForces, gravi];
     //this.forces = [];
 
     this.setForce = function(body)
       {
-        for (var i=0; i<this.forces.length; i++)
+        this.forces.map(
+        function(force)
           {
-            this.forces[i](body, system_object.set);
+            force(body, system_object.set);
           }
+          )
       }
 
     this.setForceAll = function()
       {
-        for (var i=0; i<system_object.set.length; i++)
+        var reactor = this
+        system_object.set.map(
+        function(body)  
           {
-            this.setForce(system_object.set[i]);
-          }        
+            reactor.setForce(body)
+          }
+        )
       }
 
     this.moveForceAll = function()
       {
         this.setForceAll();
-        for (var i=0; i<system_object.set.length; i++)
+        
+        system_object.set.map(
+        function(body)  
           {
-            if (system_object.set[i].canMove)
-            system_object.set[i].moveForce();
-          }        
+            if (body.canMove)
+            body.moveForce()
+          }
+        )    
       }
 
     this.moveConstrainsBody = function(body)
@@ -332,12 +345,16 @@ function Reactor(system_object)
 
     this.moveConstrainsAll = function()
       {
-        for (var i=0; i<system_object.set.length; i++)
+        
+        var reactor = this
+        system_object.set.map(
+        function(body)
           {
-            this.moveConstrainsBody(system_object.set[i]);
-            this.grid.sort(system_object.set[i]);
+            reactor.moveConstrainsBody(body);
+            reactor.grid.sort(body)
           }
-
+        )
+        
         for (var i=0; i<this.grid.cells.length; i++)
           {
             collisions(this.grid.cells[i]);
@@ -374,13 +391,15 @@ function Renderer(id, width, height, system_object)
     this.handle.ctx = this.handle.getContext("2d");
     this.handle.ctx.fillStyle = "rgb(220,220,220)";
     this.handle.ctx.strokeStyle = "rgb(20, 20, 20)";
-    this.handle.ctx.lineWidth = 3;
+    this.handle.ctx.lineWidth = 1;
     this.handle.ctx.fillRect(0,0,this.handle.width,this.handle.height);
     this.handle.ctx.scale(1,1);
+
     this.clear = function()
       {
         this.handle.ctx.fillRect(0,0,this.handle.width,this.handle.height);  
       }
+
     this.draw_body = function(body)
       {
         this.handle.ctx.beginPath();
@@ -388,6 +407,7 @@ function Renderer(id, width, height, system_object)
         this.handle.ctx.stroke();
         this.handle.ctx.closePath();
       }
+
     this.renderall = function()
       {
         this.clear();
@@ -401,6 +421,7 @@ function Renderer(id, width, height, system_object)
   
 function Controller(reactor, renderer)
   {
+    var controller = this
     this.perform = document.getElementById("perform");
     this.simState = 1;
     this.simTime = 0;
@@ -428,26 +449,26 @@ function Controller(reactor, renderer)
     this.stepSimulation = function() 
       {
         if (this.simState == 1)
-        {
-        var t0 = new Date()
-        var s0 = t0.getMilliseconds();
-        this.reactor.moveConstrainsAll();
-        this.reactor.moveForceAll();
-        var t1 = new Date()
-        var s1 = t1.getMilliseconds();
-        if (s1-s0>0)
-        this.simTime = s1-s0;
-        }
+          {
+            var s0 = new Date().getMilliseconds();
+            this.reactor.moveConstrainsAll();
+            this.reactor.moveForceAll();
+            var s1 = new Date().getMilliseconds();
+            if (s1-s0>0)
+              {
+                console.log(s1-s0)
+              }
+          }
       }
-
-    this.getPerform = function()
-      {
-        //this.perform.textContent = "sim.time="+this.simTime.toString()+"ms.  "+"draw.time="+this.drawTime+"ms.";
-      }    
     
     this.simulate = function(delay)
       {
-        setInterval("controller.stepSimulation()", delay);
+        setInterval(
+        function()
+          {
+            controller.stepSimulation()  
+          },         
+        delay);
       }
 
     this.renderScene = function()
@@ -463,14 +484,18 @@ function Controller(reactor, renderer)
 
     this.render = function(delay)
       {
-        setInterval("controller.renderScene()", delay);
+        setInterval(
+        function()
+          {
+            controller.renderScene()
+          }, 
+        delay);
       }
 
-    this.run = function(sim_delay, rend_delay)
+    this.run = function(simulation_delay, render_delay)
       {  
-        this.simulate(sim_delay);
-        this.render(rend_delay);
-        setInterval("controller.getPerform()", 300);
+        this.simulate(simulation_delay);
+        this.render(render_delay);
       }
   }
 
@@ -478,12 +503,12 @@ window.onload = function()
   {
     system = new System();
     //Filling system
-    for (var i = 0; i<200; i++) 
-      { system.push( new Body(Math.random()*700, Math.random()*400, 5) ); }
+    for (var i = 0; i<100; i++) 
+      { system.push( new Body(Math.random()*700, Math.random()*400, 10) ); }
     react = new Reactor(system);
     viewport = new Renderer("canva", 1000,600, system);
     controller = new Controller( react, viewport );
-    controller.run(5,10);    
+    controller.run(0,10);    
   };
 
 
